@@ -19,17 +19,14 @@ def extrairboletos(visual):
     import messagebox
     import sys
     import datetime
-    from bs4 import BeautifulSoup
 
-    codigocliente = ''
     site = None
     listaexcel = []
-
-    resolveucaptcha = False
+    texto = ''
 
     # try:
     gerarboleto = not visual.var1.get()
-    salvardadospdf = visual.var2.get()
+    # salvardadospdf = visual.var2.get()
 
     visual.acertaconfjanela(False)
 
@@ -80,18 +77,19 @@ def extrairboletos(visual):
     bd.fecharbanco()
 
     pastadownload = aux.caminhoprojeto() + '\\' + 'Downloads'
-    listachaves = ['Código Cliente', 'CBM', 'Área Construída', 'Utilização', 'Faixa', 'Proprietário', 'Endereço', 'Ano', 'Valor', 'Status']
+    listachaves = ['Cod Cliente', 'Nº CBMERJ', 'Área Construída', 'Utilização', 'Faixa', 'Proprietário', 'Endereço',
+                   'taxa[anos_em_debito]', 'taxa[Exercicio]', 'taxa[Parcela]', 'taxa[Vencimento]', 'taxa[Valor]',
+                   'taxa[Mora]', 'taxa[Total]', 'Status']
     listaexcel = []
     site = web.TratarSite(senha.site, 'ExtrairBoletoIPTU')
 
-    tempoinicio = time.time()
     for indice, linha in enumerate(resultado):
         resolveucaptcha = False
-        if aux.hora('America/Sao_Paulo', 'HORA') < datetime.time(22, 00, 00):
+        if aux.hora('America/Sao_Paulo', 'HORA') < datetime.time(22, 00, 00) and texto != 'Este serviço encontra-se temporariamente indisponível.':
             codigocliente = linha['codigo']
             # ==================== Parte Gráfica =======================================================
             visual.mudartexto('labelcodigocliente', 'Código Cliente: ' + codigocliente)
-            visual.mudartexto('labelinscricao', 'Inscrição: ' + aux.left(str(linha['cbm']), 6) + '-' + aux.right(str(linha['cbm']), 1))
+            visual.mudartexto('labelinscricao', 'Inscrição: ' + aux.left(str(linha['cbm']), 7) + '-' + aux.right(str(linha['cbm']), 1))
             visual.mudartexto('labelquantidade', 'Item ' + str(indice + 1) + ' de ' + str(len(resultado)) + '...')
             visual.mudartexto('labelstatus', 'Extraindo boleto...')
             # Atualiza a barra de progresso das transações (Views)
@@ -99,7 +97,8 @@ def extrairboletos(visual):
             time.sleep(0.1)
             # ==================== Parte Gráfica =======================================================
             caminhodestino = pastadownload + '/' + codigocliente + '_' + linha['cbm'] + '.pdf'
-            while not(resolveucaptcha) and aux.hora('America/Sao_Paulo', 'HORA') < datetime.time(22, 00, 00):
+            while not resolveucaptcha and aux.hora('America/Sao_Paulo', 'HORA') < datetime.time(22, 00, 00):
+                texto = ''
                 if aux.hora('America/Sao_Paulo', 'HORA') < datetime.time(22, 00, 00):
                     if not os.path.isfile(caminhodestino) or not gerarboleto:
                         if site is not None:
@@ -122,7 +121,7 @@ def extrairboletos(visual):
                                 # "Limpa" o campo de inscrição
                                 inscricao.clear()
                                 # Preenche o campo de inscrição com os dados do banco de dados (sem o dígito verificador)
-                                inscricao.send_keys(aux.left(linha['cbm'], 6))
+                                inscricao.send_keys(aux.left(linha['cbm'], 7))
                                 # "Limpa" o campo do dígito verificador
                                 dv.clear()
                                 # Preenche o campo do dígito verificador com os dados do banco de dados
@@ -134,73 +133,59 @@ def extrairboletos(visual):
                                     # Função que pede como entrada a caixa de texto do código de segurança e o botão de confirmar, como retorno
                                     # dá um booleano que diz se conseguiu resolver o captcha e a mensagem de erro (qualquer uma), caso exista.
                                     resolveucaptcha, mensagemerro = site.resolvercaptcha('NAME', 'txt_Seguranca', 'XPATH', '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr[2]/td[1]/table/tbody/tr/td/table/tbody/tr[2]/td/form/input[5]')
-                                    # Testa se resolveu o captcha e se deu algum erro
+                                    # Testa se teve erro de imóvel não encontrado e começa a busca pelo IPTU
+
+                                    if mensagemerro == 'Imóvel não encontrado. Confira os dados que você informou.':
+                                        # Limpa a mensagem de erro
+                                        mensagemerro = ''
+                                        # Se a página ficou aberta ele fecha
+                                        if site is not None:
+                                            site.fecharsite()
+                                        # Reabre o navegador na página de busca por código IPTU
+                                        site = web.TratarSite(senha.siteporiptu, senha.nomeprofile)
+                                        # Inicia o navegador
+                                        site.abrirnavegador()
+                                        if site is not None and site.navegador != -1:
+                                            # Campo de Inscrição da tela Inicial
+                                            campoiptu = site.verificarobjetoexiste('NAME', 'inscricao_e')
+                                            # Combobox com a lista de municípios
+                                            campomunicipio = site.verificarobjetoexiste('NAME', 'cod_mun_e', 'Rio de Janeiro')
+                                            # Botão para abrir a tabela de consulta
+                                            btnconsultar = site.verificarobjetoexiste('XPATH', '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/form/input[3]')
+                                            # Verifica se tem todos os elementos na tela para chamar a resolução do captcha
+                                            if campoiptu is not None and campomunicipio is not None and btnconsultar is not None:
+                                                campoiptu.send_keys(linha['iptu'])
+                                                if btnconsultar is not None:
+                                                    # Clique no botão
+                                                    if getattr(sys, 'frozen', False):
+                                                        btnconsultar.click()
+                                                    else:
+                                                        site.navegador.execute_script("arguments[0].click()", btnconsultar)
+
+                                                    achouimagem, baixouimagem = site.baixarimagem('ID', 'cod_seguranca', aux.caminhoprojeto() + '\\' + 'Downloads\\captcha.png')
+                                                    if achouimagem and baixouimagem:
+                                                        resolveucaptcha, mensagemerro = site.resolvercaptcha('NAME', 'txt_Seguranca', 'XPATH',
+                                                                                                             '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/form/input[5]')
+
                                     if resolveucaptcha and len(mensagemerro) == 0:
                                         # Verifica se está na página de geração de boletos
                                         if site.url == senha.site:
                                             # Área de retorno dos campos de informação do imposto
                                             # ==================================================================================================================================
-                                            site.retornartabela(2)
-                                            area = site.verificarobjetoexiste('XPATH',
-                                                                              '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/table[1]/tbody/tr[2]/td[2]')
-                                            if area is None:
-                                                area = ''
-                                            else:
-                                                area = area.text
-                                            utilizacao = site.verificarobjetoexiste('XPATH',
-                                                                                    '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/table[1]/tbody/tr[3]/td[2]')
-                                            if utilizacao is None:
-                                                utilizacao = ''
-                                            else:
-                                                utilizacao = utilizacao.text
-
-                                            faixa = site.verificarobjetoexiste('XPATH',
-                                                                               '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/table[1]/tbody/tr[4]/td[2]')
-                                            if faixa is None:
-                                                faixa = ''
-                                            else:
-                                                faixa = faixa.text
-
-                                            proprietario = site.verificarobjetoexiste('XPATH',
-                                                                                      '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/table[1]/tbody/tr[5]/td[2]')
-                                            if proprietario is None:
-                                                proprietario = ''
-                                            else:
-                                                proprietario = proprietario.text
-
-                                            endereco = site.verificarobjetoexiste('XPATH',
-                                                                                  '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/table[1]/tbody/tr[7]/td[2]')
-                                            if endereco is None:
-                                                endereco = ''
-                                            else:
-                                                endereco = endereco.text
-
-                                            ano = site.verificarobjetoexiste('XPATH',
-                                                                             '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/table[2]/tbody/tr[3]/td[1]/b')
-                                            if ano is None:
-                                                ano = ''
-                                            else:
-                                                ano = ano.text
-
-                                            # valor = site.verificarobjetoexiste('XPATH',
-                                            #                                    '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td/table[2]/tbody/tr[3]/td[2]')
-
-                                            valor = site.verificarobjetoexiste('NAME', 'taxa[Total]')
-
-                                            if valor is None:
-                                                valor = ''
-                                            else:
-                                                valor = valor.text
-
+                                            tabelaimovel = site.retornartabela(1)
+                                            tabelacobranca = site.retornartabela(2)
                                             # ==================================================================================================================================
 
-                                            # Armazena os dados para serem adicionados no excel com o resultado
-                                            if float(valor) == 0:
-                                                dadoscbm = [codigocliente, linha['cbm'], area, utilizacao, faixa, proprietario, endereco, ano, '0,00', 'Pago ou Isento']
-                                            else:
-                                                dadoscbm = [codigocliente, linha['cbm'], area, utilizacao, faixa, proprietario, endereco, ano, valor, 'Com Guia']
+                                            for linhacobranca in tabelacobranca:
+                                                linhanova = {'Cod Cliente': codigocliente}
+                                                linhanova.update(tabelaimovel[0])
+                                                linhanova.update(linhacobranca)
+                                                if int(linhacobranca.get('taxa[Exercicio]')) < aux.hora('America/Sao_Paulo', 'DATA').year-1:
+                                                    linhanova.update({'Status': 'Vencido'})
+                                                else:
+                                                    linhanova.update({'Status': 'Imposto Ano Corrente'})
 
-                                            listaexcel.append(dict(zip(listachaves, dadoscbm)))
+                                                listaexcel.append(linhanova)
 
                                             # Começa a gerar os boletos (se marcado essa opção)
                                             if gerarboleto:
@@ -270,15 +255,27 @@ def extrairboletos(visual):
                                         # Verifica se o problema não foi o captcha
                                         if resolveucaptcha:
                                             # Linha de erro para carregar no excel
-                                            dadosiptu = [codigocliente, linha['cbm'], '', '', '', '', '', '', '', mensagemerro]
+                                            dadoscbm = [codigocliente, aux.left(str(linha['cbm']), 7) + '-' + aux.right(str(linha['cbm']), 1), '', '', '', '', '', '', '', '', '', '', '', '', mensagemerro]
                                             # Adiciona o item com o cabeçalho
-                                            listaexcel.append(dict(zip(listachaves, dadosiptu)))
+                                            listaexcel.append(dict(zip(listachaves, dadoscbm)))
                                             # Fecha o site
                                             site.fecharsite()
+                            else:
+                                texto = site.retornartabela(3)
+                                if texto == 'Este serviço encontra-se temporariamente indisponível.':
+                                    break
+
         else:
             # Mensagem de horário inválido para gerar boleto
             visual.acertaconfjanela(False)
-            messagebox.msgbox('Impossível gerar boletos depois das 22:00!', messagebox.MB_OK, 'Horário Inválido')
+            # Texto quando o serviço está indisponível
+            if texto != 'Este serviço encontra-se temporariamente indisponível.':
+                # Caso o erro não seja de serviço indisponível o horário é inválido
+                messagebox.msgbox('Impossível gerar boletos depois das 22:00!', messagebox.MB_OK, 'Horário Inválido')
+            else:
+                # Mensagem de serviço indisponível
+                messagebox.msgbox('Serviço fora do ar!', messagebox.MB_OK, 'Serviço com problemas')
+
             # Sai do Looping
             break
 
@@ -293,7 +290,8 @@ def extrairboletos(visual):
         # Atualiza o status na tela de usuário
         visual.mudartexto('labelstatus', 'Salvando lista...')
         # Escreve no arquivo a lista e salva o Excel
-        aux.escreverlistaexcelog('Log_' + aux.acertardataatual() + '.xlsx', listaexcel)
+        nomearquivo = 'Log_' + aux.acertardataatual() + '.xlsx'
+        aux.escreverlistaexcelog(nomearquivo, listaexcel)
 
     tempofim = time.time()
 
@@ -306,4 +304,3 @@ def extrairboletos(visual):
     messagebox.msgbox(
         f'O tempo decorrido foi de: {"{:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), int(seconds))}',
         messagebox.MB_OK, 'Tempo Decorrido')
-

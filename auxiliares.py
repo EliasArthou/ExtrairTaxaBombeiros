@@ -202,7 +202,7 @@ def acertardataatual():
     from datetime import datetime
 
     textodata = datetime.now()
-    return textodata.strftime('%Y_%m_%d_%H_%M_%S')
+    return str(textodata.strftime('%Y_%m_%d_%H_%M_%S'))
 
 
 def caminhospadroes(caminho):
@@ -539,15 +539,27 @@ def hora(timezone, pedaco=''):
 
     url = 'http://worldtimeapi.org/api/timezone/' + timezone
     resposta = requests.get(url)
-    match pedaco.upper():
-        case 'DATA':
-            return datetime.datetime.fromisoformat(resposta.json()['datetime']).date()
+    try:
+        match pedaco.upper():
+            case 'DATA':
+                return datetime.datetime.fromisoformat(resposta.json()['datetime']).date()
 
-        case 'HORA':
-            return datetime.datetime.fromisoformat(resposta.json()['datetime']).time()
+            case 'HORA':
+                return datetime.datetime.fromisoformat(resposta.json()['datetime']).time()
 
-        case _:
-            return datetime.datetime.fromisoformat(resposta.json()['datetime'])
+            case _:
+                return datetime.datetime.fromisoformat(resposta.json()['datetime'])
+
+    except:
+        match pedaco.upper():
+            case 'DATA':
+                return datetime.datetime.fromisoformat(resposta.json()['datetime']).date()
+
+            case 'HORA':
+                return datetime.datetime.fromisoformat(resposta.json()['datetime']).time()
+
+            case _:
+                return datetime.datetime.fromisoformat(resposta.json()['datetime'])
 
 
 def timezones_disponiveis():

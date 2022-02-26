@@ -63,11 +63,11 @@ class App(tk.Tk):
         # Extrair somente valores
         self.var1 = tk.BooleanVar()
         self.c1 = tk.Checkbutton(self, text='Somente Valores', variable=self.var1, onvalue=True, offvalue=False, font="Arial 10")
-        self.c1.place(relx=0.15, y=135)
+        self.c1.place(relx=0.046, y=135)
 
-        self.var2 = tk.BooleanVar()
-        self.c1 = tk.Checkbutton(self, text='Subir Código de Barras', variable=self.var2, onvalue=True, offvalue=False, font="Arial 10")
-        self.c1.place(relx=0.45, y=135)
+        # self.var2 = tk.BooleanVar()
+        # self.c1 = tk.Checkbutton(self, text='Subir Código de Barras', variable=self.var2, onvalue=True, offvalue=False, font="Arial 10")
+        # self.c1.place(relx=0.45, y=135)
 
         self.radio_valor = tk.IntVar()
         self.radio_valor.set(2)  # Para a segunda opção ficar marcada
@@ -102,6 +102,8 @@ class App(tk.Tk):
             self.mudartexto('labelquantidade', '')
             self.mudartexto('labelstatus', '')
             self.radio_valor.set(2)
+            self.configurarbarra('barraextracao', 1, 0)
+
 
         else:
             self.labelradio.destroy()

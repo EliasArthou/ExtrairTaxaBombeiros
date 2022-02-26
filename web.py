@@ -5,7 +5,6 @@ import os
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from anticaptchaofficial.imagecaptcha import *
-from selenium.webdriver.support.ui import Select
 import auxiliares as aux
 from bs4 import BeautifulSoup
 import messagebox
@@ -97,6 +96,9 @@ class TratarSite:
         :param itemunico: caso seja uma coleção de objetos que queira selecionar (todos o do nome de classe x), colocar False, padrão será item único.
         :return: vai retornar o objeto do site para ser trabalhado já verificando se o mesmo existe, caso não encontre retorna None
         """
+
+        from selenium.webdriver.support.ui import Select
+
         if self.navegador is not None:
             try:
                 if itemunico:
@@ -107,13 +109,17 @@ class TratarSite:
                     else:
                         elemento = WebDriverWait(self.navegador, self.delay).until(EC.visibility_of_element_located((getattr(By, identificador), endereco)))
                         # elemento = Select(self.navegador.find_element(getattr(By, identificador), endereco))
-                        elemento.select_by_value(valorselecao)
+                        select = Select(elemento)
+                        select.select_by_visible_text(valorselecao)
+                        # elemento.select_by_value(valorselecao)
                 else:
                     if len(valorselecao) == 0:
                         elemento = self.navegador.find_elements(getattr(By, identificador), endereco)
                     else:
                         elemento = Select(self.navegador.find_elements(getattr(By, identificador), endereco))
-                        elemento.select_by_value(valorselecao)
+                        select = Select(elemento)
+                        select.select_by_visible_text(valorselecao)
+                        # elemento.select_by_value(valorselecao)
 
                 if iraoobjeto and elemento is not None:
                     # action = ActionChains(self.navegador)
@@ -260,22 +266,13 @@ class TratarSite:
             # confirmar = self.verificarobjetoexiste(identicacaobotao, botao)
             # confirmar.click()
             try:
-                telamensagemerro = self.verificarobjetoexiste('XPATH', '/html/body/table[2]/tbody/tr/td[4]/table[2]/tbody/tr/td/table/tbody/tr/td')
-                mensagemerro = telamensagemerro.text
-                mensagemerro = mensagemerro.split(chr(10)+chr(10))
-                for indice, linha in enumerate(mensagemerro):
-                    mensagemerro[indice] = linha.replace(chr(10), '')
-
-                if len(mensagemerro) > 2:
-                    if mensagemerro[1].strip() == 'Código de Segurança inválido. Favor retornar.':
-                        solver.report_incorrect_image_captcha()
-                        textoerro = mensagemerro[1].strip()
-                        resposta = False
-                    else:
-                        textoerro = mensagemerro[1].strip()
-                        resposta = True
+                mensagemerro = self.retornartabela(3)
+                if mensagemerro == 'Código de Segurança inválido. Favor retornar.':
+                    solver.report_incorrect_image_captcha()
+                    textoerro = mensagemerro
+                    resposta = False
                 else:
-                    textoerro = ''
+                    textoerro = mensagemerro
                     resposta = True
 
                 if os.path.isfile(self.caminho):
@@ -296,18 +293,34 @@ class TratarSite:
 
     def retornartabela(self, tipolista):
         import re
-        from IPython.display import display
+        import unicodedata
 
         linha = []
         cabecalhos = []
         tabela = []
+        intermediario = ''
+
         pagina = BeautifulSoup(self.navegador.page_source, 'html.parser')
 
         match tipolista:
             case 1:
+                table = pagina.find('table', {'border': 0, 'width': 500})
+                for element in table.find_all('td'):
+                    if len(element.text.strip()) > 0:
+                        if aux.right(element.text, 1) == ':':
+                            intermediario = aux.to_raw(element.text)
+                            cabecalhos.append(intermediario)
+                        else:
+                            elementotratado = BeautifulSoup(str(element), 'html.parser')
+                            for br in elementotratado.find_all("br"):
+                                br.replace_with("\n")
+                            intermediario = unicodedata.normalize("NFKD", aux.to_raw(elementotratado.text))
+                            linha.append(intermediario)
+
+            case 2:
                 for element in pagina.find_all('input', {'name': re.compile('^taxa')}):
                     if element['name'] not in cabecalhos:
-                        if len(element['name']) > 0:
+                        if len(element['name']) > 0 and len(element['value']) > 0:
                             linha.append(element['value'])
                             cabecalhos.append(element['name'])
                     else:
@@ -315,22 +328,27 @@ class TratarSite:
                         cabecalhos = [element['name']]
                         linha = [element['value']]
 
-                if len(linha) > 0 and len(cabecalhos) > 0:
-                    tabela.append(dict(zip(cabecalhos, linha)))
-
-            case 2:
-                tabela = pagina.find('table', {'border': 0, 'width': 500})
-                for element in tabela.find_all('td'):
+            case 3:
+                # 4210
+                table = pagina.find('table', {'border': 0, 'cellpadding': 12, 'cellspacing': 1})
+                for element in table.find_all('td'):
                     if len(element.text.strip()) > 0:
-                        if aux.right(element.text, 1) == ':':
-                            cabecalhos.append(aux.left(element.text, len(element.text)-1))
-                        else:
-                            linha.append(element.text)
+                        elementotratado = BeautifulSoup(str(element), 'html.parser')
+                        botao = elementotratado.find('button')
+                        botao.decompose()
+                        for br in elementotratado.find_all("br"):
+                            br.replace_with("\n")
+                        intermediario = unicodedata.normalize("NFKD", aux.to_raw(elementotratado.text))
+                        intermediario = re.sub('\n+', '\n', intermediario)
+                        intermediario = intermediario.strip()
 
-                if len(linha) > 0 and len(cabecalhos) > 0:
-                    tabela.append(dict(zip(cabecalhos, linha)))
+        if tipolista != 3:
+            if len(linha) > 0 and len(cabecalhos) > 0:
+                tabela.append(dict(zip(cabecalhos, linha)))
+        else:
+            tabela = intermediario
 
-        display(tabela)
+        return tabela
 
 
 
