@@ -8,6 +8,3 @@ app = App()
 app.mainloop()
 
 
-
-
-

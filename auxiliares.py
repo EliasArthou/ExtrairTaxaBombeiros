@@ -212,6 +212,8 @@ def caminhospadroes(caminho):
     :return: retorna o caminho padrão selecionado (str)
     """
     import ctypes.wintypes
+
+
     # CSIDL	                        Decimal	Hex	    Shell	Description
     # CSIDL_ADMINTOOLS	            48	    0x30	5.0	    The file system directory that is used to store administrative tools for an individual user.
     # CSIDL_ALTSTARTUP	            29	    0x1D	 	    The file system directory that corresponds to the user's nonlocalized Startup program group.
@@ -276,13 +278,24 @@ def caminhospadroes(caminho):
     # CSIDL_TEMPLATES	            21	    0x15	 	    The file system directory that serves as a common repository for document templates.
     # CSIDL_WINDOWS	                36	    0x24	5.0	    The Windows directory or SYSROOT.
 
-    csidl_personal = caminho  # Caminho padrão
-    shgfp_type_current = 0  # Para não pegar a pasta padrão e sim a definida como documentos
+    if caminho != 80:
+        csidl_personal = caminho  # Caminho padrão
+        shgfp_type_current = 0  # Para não pegar a pasta padrão e sim a definida como documentos
 
-    buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-    ctypes.windll.Shell32.SHGetFolderPathW(None, csidl_personal, None, shgfp_type_current, buf)
+        buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
+        ctypes.windll.Shell32.SHGetFolderPathW(None, csidl_personal, None, shgfp_type_current, buf)
 
-    return buf.value
+        return buf.value
+    else:
+        if os.name == 'nt':
+            import winreg
+            sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
+            downloads_guid = '{374DE290-123F-4565-9164-39C4925E467B}'
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
+                location = winreg.QueryValueEx(key, downloads_guid)[0]
+            return location
+        else:
+            return os.path.join(os.path.expanduser('~'), 'downloads')
 
 
 def caminhoselecionado(tipojanela=1, titulojanela='Selecione o caminho/arquivo:',
@@ -407,7 +420,7 @@ def adicionarcabecalhopdf(arquivo, arquivodestino, cabecalho):
     pdfmetrics.registerFont(TTFont('Arial', 'arial-bold.ttf'))
     can = canvas.Canvas(packet, pagesize=letter)
     can.setFont('Arial', 10)
-    can.drawString(300, 820, cabecalho)
+    can.drawString(500, 820, cabecalho)
     can.save()
 
     # move to the beginning of the StringIO buffer

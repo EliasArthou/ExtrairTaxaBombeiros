@@ -56,29 +56,43 @@ class TratarSite:
             time.sleep(1)
             return self.navegador
 
-    def configuraprofilechrome(self):
+    def configuraprofilechrome(self, ableprintpreview=True):
         """
         Configura usuário e opções no navegador aberto para execução
         return: o navegador configurado para iniciar a execução das rotinas
         """
+        settings = {
+            "recentDestinations": [{
+                "id": "Save as PDF",
+                "origin": "local",
+                "account": "",
+            }], "selectedDestinationId": "Save as PDF",
+            "version": 2
+        }
+        prefs = {'printing.print_preview_sticky_settings.appState': json.dumps(settings)}
+        if aux.caminhoprojeto('Downloads') != '':
+            prefs = {**prefs, **{
+                    "profile.name": self.perfil,
+                    "download.default_directory": aux.caminhoprojeto('Downloads'),  # Change default directory for downloads
+                    "download.directory_upgrade": True,
+                    "download.prompt_for_download": False,  # To auto download the file
+                    "plugins.always_open_pdf_externally": True  # It will not show PDF directly in chrome
+                }}
+
         self.options = webdriver.ChromeOptions()
         if aux.caminhoprojeto('Profile') != '':
             self.options.add_argument("user-data-dir=" + aux.caminhoprojeto('Profile'))
             self.options.add_argument("--start-maximized")
-            self.options.add_argument("---printing")
-            self.options.add_argument("--disable-print-preview")
+            self.options.add_experimental_option('prefs', prefs)
+            if ableprintpreview:
+                self.options.add_argument('--kiosk-printing')
+            else:
+                self.options.add_argument("---printing")
+                self.options.add_argument("--disable-print-preview")
+
             self.options.add_argument("--silent")
             # Forma invisível
             # self.options.add_argument("--headless")
-
-            if aux.caminhoprojeto('Downloads') != '':
-                self.options.add_experimental_option('prefs', {
-                    "profile.name": self.perfil,
-                    "download.default_directory": aux.caminhoprojeto('Downloads'),  # Change default directory for downloads
-                    "download.prompt_for_download": False,  # To auto download the file
-                    "download.directory_upgrade": True,
-                    "plugins.always_open_pdf_externally": True  # It will not show PDF directly in chrome
-                })
 
         chrome_service = Service('chromedriver.exe')
         chrome_service.creationflags = CREATE_NO_WINDOW
@@ -88,7 +102,7 @@ class TratarSite:
     def verificarobjetoexiste(self, identificador, endereco, valorselecao='', itemunico=True, iraoobjeto=False):
         """
 
-        :param iraoobjeto: se simula o mouse em cima doi objeto ou não.
+        :param iraoobjeto: se simula o mouse em cima do objeto ou não.
         :param identificador: como será identificado, por nome, por nome de classe, etc.
         :param endereco: nome do objeto no site (lembrando que o nome é segundo o parâmetro anterior, se for definido ID no parâmetro anterior,
                          nesse tem que vir o ID do objeto do site, por exemplo.
@@ -122,10 +136,6 @@ class TratarSite:
                         # elemento.select_by_value(valorselecao)
 
                 if iraoobjeto and elemento is not None:
-                    # action = ActionChains(self.navegador)
-                    # if getattr(sys, 'frozen', False):
-                    #    action.move_to_element(elemento).click().perform()
-                    # else:
                     self.navegador.execute_script("arguments[0].click()", elemento)
 
                 return elemento
@@ -224,8 +234,13 @@ class TratarSite:
             return len(self.navegador.window_handles)
 
     def irparaaba(self, indice):
+        """
+
+        :param indice: número absoluto da aba desejada
+        :return:
+        """
         if indice <= self.num_abas():
-            self.navegador.switchTo().window(self.navegador.getWindowHandles().get(indice))
+            self.navegador.switch_to.window(self.navegador.window_handles[indice - 1])
 
     def fecharaba(self, indice=0):
         if indice == 0:
@@ -234,9 +249,28 @@ class TratarSite:
             self.irparaaba(indice)
             self.navegador.execute_script('window.open("","_self").close()')
 
+    def trataralerta(self):
+        from selenium.webdriver.common.alert import Alert
+        from selenium.common.exceptions import NoAlertPresentException
+
+        try:
+            alerta = Alert(self.navegador)
+            if alerta is not None:
+                textoalerta = alerta.text
+                alerta.accept()
+                time.sleep(1)
+            else:
+                textoalerta = ''
+
+        except NoAlertPresentException:
+            textoalerta = ''
+            pass
+
+        return textoalerta
+
     def fecharsite(self):
         """
-        fecha o browser carrregado no objeto
+        fecha o browser carregado no objeto
         """
         if self.navegador is not None and hasattr(self.navegador, 'quit'):
             self.navegador.quit()
@@ -263,11 +297,10 @@ class TratarSite:
             captcha = self.verificarobjetoexiste(identificacaocaixa, caixacaptcha)
             captcha.send_keys(captcha_text)
             self.verificarobjetoexiste(identicacaobotao, botao, iraoobjeto=True)
-            # confirmar = self.verificarobjetoexiste(identicacaobotao, botao)
-            # confirmar.click()
+
             try:
                 mensagemerro = self.retornartabela(3)
-                if mensagemerro == 'Código de Segurança inválido. Favor retornar.':
+                if mensagemerro == 'Código de Segurança inválido. Favor retornar.':
                     solver.report_incorrect_image_captcha()
                     textoerro = mensagemerro
                     resposta = False
@@ -329,18 +362,27 @@ class TratarSite:
                         linha = [element['value']]
 
             case 3:
-                # 4210
+                # 4170
                 table = pagina.find('table', {'border': 0, 'cellpadding': 12, 'cellspacing': 1})
-                for element in table.find_all('td'):
-                    if len(element.text.strip()) > 0:
-                        elementotratado = BeautifulSoup(str(element), 'html.parser')
-                        botao = elementotratado.find('button')
-                        botao.decompose()
-                        for br in elementotratado.find_all("br"):
-                            br.replace_with("\n")
-                        intermediario = unicodedata.normalize("NFKD", aux.to_raw(elementotratado.text))
-                        intermediario = re.sub('\n+', '\n', intermediario)
-                        intermediario = intermediario.strip()
+                itenstabela = table.find_all('td')
+                if len(itenstabela) == 1:
+                    for element in itenstabela:
+                        if len(element.text.strip()) > 0:
+                            elementotratado = BeautifulSoup(str(element), 'html.parser')
+                            botao = elementotratado.find('button')
+                            if botao is not None:
+                                botao.decompose()
+                            else:
+                                botao = elementotratado.find('a', {'href': 'javascript: history.back()'})
+                                if botao is not None:
+                                    botao.decompose()
+
+                            for br in elementotratado.find_all("br"):
+                                br.replace_with("\n")
+                            intermediario = unicodedata.normalize("NFKD", aux.to_raw(elementotratado.text))
+                            intermediario = re.sub('\n+', '\n', intermediario)
+                            intermediario = intermediario.replace('Emissão de 2a Via da Taxa e Consulta a Débitos Anteriores', '')
+                            intermediario = intermediario.strip()
 
         if tipolista != 3:
             if len(linha) > 0 and len(cabecalhos) > 0:
@@ -349,8 +391,3 @@ class TratarSite:
             tabela = intermediario
 
         return tabela
-
-
-
-
-
