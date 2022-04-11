@@ -156,7 +156,7 @@ class TratarSite:
 
     def mexerzoom(self, valor):
         """
-        Desce a barra de rolagem do navegador
+        Mexe no zoom da página
         """
         self.navegador.execute_script("document.body.style.transform='scale(" + str(valor) + ")';")
         time.sleep(1)

@@ -213,7 +213,6 @@ def caminhospadroes(caminho):
     """
     import ctypes.wintypes
 
-
     # CSIDL	                        Decimal	Hex	    Shell	Description
     # CSIDL_ADMINTOOLS	            48	    0x30	5.0	    The file system directory that is used to store administrative tools for an individual user.
     # CSIDL_ALTSTARTUP	            29	    0x1D	 	    The file system directory that corresponds to the user's nonlocalized Startup program group.
@@ -563,7 +562,7 @@ def hora(timezone, pedaco=''):
             case _:
                 return datetime.datetime.fromisoformat(resposta.json()['datetime'])
 
-    except:
+    except Exception:
         match pedaco.upper():
             case 'DATA':
                 return datetime.datetime.fromisoformat(resposta.json()['datetime']).date()
@@ -582,4 +581,3 @@ def timezones_disponiveis():
     resposta = requests.get(url)
     timezones = resposta.json()
     return timezones
-

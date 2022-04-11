@@ -22,6 +22,7 @@ def extrairboletos(visual):
     site = None
     listaexcel = []
     texto = ''
+    tempoinicio = time.time()
 
     try:
         gerarboleto = not visual.var1.get()
@@ -152,7 +153,7 @@ def extrairboletos(visual):
                                             # Fecha o site
                                             site.fecharsite()
                                         # Reabre o navegador na página de busca por código IPTU
-                                        site = web.TratarSite(senha.siteporiptu, senha.nomeprofile)
+                                        site = web.TratarSite(senha.siteporcmb, senha.nomeprofile)
                                         # Inicia o navegador
                                         site.abrirnavegador()
                                         if site is not None and site.navegador != -1:
@@ -217,66 +218,81 @@ def extrairboletos(visual):
                                                     indicebotao = 0
                                                     indiceano = 0
                                                     anoanterior = ''
+                                                    # Laço para percorrer todos os botões (inclusive os que não são de boleto)
                                                     for botao in botoes:
+                                                        # Verifica se é um botão de gerar boleto para poder interagir com ele
                                                         if botao.get_attribute("value") == "Gerar Boleto":
-                                                            if botao is not None:
-                                                                if getattr(sys, 'frozen', False):
-                                                                    botao.click()
-                                                                else:
-                                                                    site.navegador.execute_script("arguments[0].click()", botao)
-                                                                indicebotao += 1
+                                                            # Ação de clicar no botão
+                                                            if getattr(sys, 'frozen', False):
+                                                                botao.click()
+                                                            else:
+                                                                site.navegador.execute_script("arguments[0].click()", botao)
 
-                                                                if listaanos[indicebotao-1] != anoanterior:
-                                                                    indiceano = 0
-                                                                    anoanterior = listaanos[indicebotao-1]
-                                                                else:
-                                                                    indiceano += 1
+                                                            # Anda com o índice cada vez que o botão é um botão que gera boleto
+                                                            indicebotao += 1
 
-                                                                site.trataralerta()
+                                                            # Verifica se tem que criar um índice nos arquivos por ano
+                                                            # (quanto tem mais de um boleto por ano)
+                                                            if listaanos[indicebotao-1] != anoanterior:
+                                                                indiceano = 0
+                                                                anoanterior = listaanos[indicebotao-1]
+                                                            else:
+                                                                indiceano += 1
 
-                                                                # Verifica a quantidade de abas
-                                                                if site.num_abas() > 1:
-                                                                    # Vai para a última aba
+                                                            # Trata o alerta (caso apareça), fechando o mesmo
+                                                            site.trataralerta()
+
+                                                            # Verifica a quantidade de abas
+                                                            if site.num_abas() > 1:
+                                                                # Vai para a última aba
+                                                                site.irparaaba(site.num_abas())
+                                                                # Verifica se está na tela do boleto
+                                                                if site.navegador.current_url == senha.telaboleto:
+                                                                    # Botão de impressão
+                                                                    imprimir = site.verificarobjetoexiste('CLASS_NAME', 'no_print')
+                                                                    # Verifica se o botão de impressão existe
+                                                                    if imprimir is not None:
+                                                                        # Muda o status na tela
+                                                                        visual.mudartexto('labelstatus', 'Salvando Boleto...')
+                                                                        # Ativa o botão de imprimir do visualizar impressão
+                                                                        site.navegador.execute_script('window.print();')
+                                                                        # Pasta Download inicial
+                                                                        pastadownloadinicial = aux.caminhospadroes(80)
+                                                                        # Espera o download
+                                                                        site.esperadownloads(pastadownloadinicial, 10)
+                                                                        # Verifica o último arquivo baixado
+                                                                        baixado = aux.ultimoarquivo(pastadownloadinicial, '.pdf')
+                                                                        # Verifica se o arquivo baixado vem do site
+                                                                        if 'modules' not in baixado and 'Taxa de Incêndio' not in baixado:
+                                                                            # Caso não seja do site ele "limpa" a informação do último arquivo da pasta
+                                                                            baixado = ''
+
+                                                                        # Verifica se o arquivo baixado vem do site para renomear, adicionar o cabeçalho
+                                                                        # e mover para a pasta de download definida
+                                                                        if len(baixado) > 0:
+                                                                            # Define o nome do arquivo (adicionando o índice de ano quando necessário)
+                                                                            if indiceano == 0:
+                                                                                caminhodestino = pastadownload + '/' + listaanos[indicebotao-1] + '_' + codigocliente + '_' + \
+                                                                                                 linha['cbm'] + '.pdf'
+                                                                            else:
+                                                                                caminhodestino = pastadownload + '/' + listaanos[indicebotao-1] + '_' + codigocliente + '_' + \
+                                                                                                 linha['cbm'] + '_' + str(indiceano) + '.pdf'
+
+                                                                            # Trata o caminho para ignorar caracteres especiais no endereço
+                                                                            caminhodestino = aux.to_raw(caminhodestino)
+                                                                            # Adiciona o código do cliente ao cabeçalho e move o arquivo para o caminho de destino
+                                                                            aux.adicionarcabecalhopdf(baixado, caminhodestino, codigocliente)
+                                                                # Verifica se tem abas abertas de boletos
+                                                                while site.num_abas() > 1:
+                                                                    # Vai para última aba para não fechar a aba que tem os botões de gerar boleto
                                                                     site.irparaaba(site.num_abas())
-                                                                    # Verifica se está na tela do boleto
-                                                                    if site.navegador.current_url == senha.telaboleto:
-                                                                        # Botão de impressão
-                                                                        imprimir = site.verificarobjetoexiste('CLASS_NAME', 'no_print')
-                                                                        # Verifica se o botão de impressão existe
-                                                                        if imprimir is not None:
-                                                                            # Muda o status na tela
-                                                                            visual.mudartexto('labelstatus', 'Salvando Boleto...')
-                                                                            # Ativa o botão de imprimir do visualizar impressão
-                                                                            site.navegador.execute_script('window.print();')
-                                                                            # Pasta Download inicial
-                                                                            pastadownloadinicial = aux.caminhospadroes(80)
-                                                                            # Espera o download
-                                                                            site.esperadownloads(pastadownloadinicial, 10)
-                                                                            # Verifica o último arquivo baixado
-                                                                            baixado = aux.ultimoarquivo(pastadownloadinicial, '.pdf')
-                                                                            # Verifica se o arquivo baixado vem do site
-                                                                            if 'modules' not in baixado and 'Taxa de Incêndio' not in baixado:
-                                                                                # Caso não seja do site ele "limpa" a informação do último arquivo da pasta
-                                                                                baixado = ''
-
-                                                                            # Verifica se o arquivo baixado vem do site para renomear, adicionar o cabeçalho
-                                                                            # e mover para a pasta de download definida
-                                                                            if len(baixado) > 0:
-                                                                                if indiceano == 0:
-                                                                                    caminhodestino = pastadownload + '/' + codigocliente + '_' + linha['cbm'] + '_' + \
-                                                                                                     listaanos[indicebotao-1] + '.pdf'
-                                                                                else:
-                                                                                    caminhodestino = pastadownload + '/' + codigocliente + '_' + \
-                                                                                                     linha['cbm'] + '_' + listaanos[indicebotao-1] + '_' + str(indiceano) + '.pdf'
-
-                                                                                caminhodestino = aux.to_raw(caminhodestino)
-                                                                                # Adiciona o código do cliente ao cabeçalho
-                                                                                aux.adicionarcabecalhopdf(baixado, caminhodestino, codigocliente)
-                                                                    while site.num_abas() > 1:
-                                                                        site.fecharaba()
-                                                                        site.irparaaba(site.num_abas())
-                                                                if resposta == 1 and indiceano == 1 and listaanos[len(listaanos) - 1] == listaanos[indicebotao-1]:
-                                                                    break
+                                                                    # Fecha as abas de boletos
+                                                                    site.fecharaba()
+                                                                    # Vai para última aba para não fechar a aba que tem os botões de gerar boleto
+                                                                    site.irparaaba(site.num_abas())
+                                                            # Se a opção de boleto único for marcada ele não continua extraindo os boletos do parcelamento
+                                                            if resposta == 1 and indiceano == 1 and listaanos[len(listaanos) - 1] == listaanos[indicebotao-1]:
+                                                                break
 
                                                 # Verifica se o site está na memória
                                                 if site is not None:
