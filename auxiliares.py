@@ -57,6 +57,7 @@ def ultimoarquivo(caminho, extensao):
         if extensao.upper() in arquivo.upper():
             if os.path.getmtime(caminho + '/' + arquivo) > ultimadata:
                 ultimoatualizado = caminho + '/' + arquivo
+                ultimadata = os.path.getmtime(caminho + '/' + arquivo)
 
     return ultimoatualizado
 
@@ -294,7 +295,7 @@ def caminhospadroes(caminho):
                 location = winreg.QueryValueEx(key, downloads_guid)[0]
             return location
         else:
-            return os.path.join(os.path.expanduser('~'), 'downloads')
+            return os.path.join(os.path.expanduser('~'), 'Downloads')
 
 
 def caminhoselecionado(tipojanela=1, titulojanela='Selecione o caminho/arquivo:',

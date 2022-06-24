@@ -5,7 +5,7 @@ Constrói a janela
 import sys
 import tkinter as tk
 from tkinter import ttk
-from extracao import extrairboletos
+from extracao import extrairboletos, extrairdivida
 
 
 class App(tk.Tk):
@@ -73,10 +73,15 @@ class App(tk.Tk):
         self.radio_valor.set(2)  # Para a segunda opção ficar marcada
         self.manipularradio()
 
-        # button Iniciar Extração
-        self.executar = ttk.Button(self, text='Executar')
+        # button Iniciar Extração Taxa de Bombeiro
+        self.executar = ttk.Button(self, text='Extrair Taxa')
         self.executar['command'] = self.executar_clicked
         self.executar.place(x=10, rely=(1 / 10) * 8)
+
+        # button Iniciar Extração Dívida Ativa
+        self.executardivida = ttk.Button(self, text='Extrair Nada Consta')
+        self.executardivida['command'] = self.executardivida_clicked
+        self.executardivida.place(x=160, rely=(1 / 10) * 8)
 
         # button Fechar a Janela
         self.fechar = ttk.Button(self, text='Fechar')
@@ -104,7 +109,6 @@ class App(tk.Tk):
             self.radio_valor.set(2)
             self.configurarbarra('barraextracao', 1, 0)
 
-
         else:
             self.labelradio.destroy()
             self.cotaunica.destroy()
@@ -118,6 +122,13 @@ class App(tk.Tk):
         """
         self.manipularradio(False)
         extrairboletos(self)
+
+    def executardivida_clicked(self):
+        """
+        Ação do botão
+        """
+        self.manipularradio(False)
+        extrairdivida(self)
 
     def fechar_clicked(self):
         """

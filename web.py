@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import messagebox
 import sensiveis as senhas
 from subprocess import CREATE_NO_WINDOW
-
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
@@ -76,14 +76,14 @@ class TratarSite:
                     "download.default_directory": aux.caminhoprojeto('Downloads'),  # Change default directory for downloads
                     "download.directory_upgrade": True,
                     "download.prompt_for_download": False,  # To auto download the file
-                    "plugins.always_open_pdf_externally": True  # It will not show PDF directly in chrome
+                     "plugins.always_open_pdf_externally": True  # It will not show PDF directly in chrome
                 }}
 
         self.options = webdriver.ChromeOptions()
         if aux.caminhoprojeto('Profile') != '':
             self.options.add_argument("user-data-dir=" + aux.caminhoprojeto('Profile'))
             self.options.add_argument("--start-maximized")
-            self.options.add_experimental_option('prefs', prefs)
+            # self.options.add_experimental_option('prefs', prefs)
             if ableprintpreview:
                 self.options.add_argument('--kiosk-printing')
             else:
@@ -94,10 +94,10 @@ class TratarSite:
             # Forma invisível
             # self.options.add_argument("--headless")
 
-        chrome_service = Service('chromedriver.exe')
-        chrome_service.creationflags = CREATE_NO_WINDOW
+        servico = Service(ChromeDriverManager().install())
+        servico.creationflags = CREATE_NO_WINDOW
 
-        return webdriver.Chrome(options=self.options)
+        return webdriver.Chrome(service=servico, options=self.options)
 
     def verificarobjetoexiste(self, identificador, endereco, valorselecao='', itemunico=True, iraoobjeto=False):
         """
@@ -249,15 +249,27 @@ class TratarSite:
             self.irparaaba(indice)
             self.navegador.execute_script('window.open("","_self").close()')
 
-    def trataralerta(self):
+    def trataralerta(self, retornatexto=True):
         from selenium.webdriver.common.alert import Alert
         from selenium.common.exceptions import NoAlertPresentException
+        from selenium.webdriver.common.keys import Keys
 
         try:
+
             alerta = Alert(self.navegador)
             if alerta is not None:
-                textoalerta = alerta.text
-                alerta.accept()
+                if retornatexto:
+                    textoalerta = alerta.text
+                    alerta.accept()
+                else:
+                    textoalerta = ''
+                    botao = self.navegador.switch_to.active_element
+
+                    botao.send_keys(Keys.ENTER)
+                    botao.send_keys(Keys.ENTER)
+                    # self.navegador.switch_to.alert.accept()
+
+
                 time.sleep(1)
             else:
                 textoalerta = ''
